@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor with Centered Teleport GUI & Camera Safety
+-- TSB Metal Bat Predictor with Right-Side Dropdown GUI and Auto Cleanup of Clones
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -126,7 +126,7 @@ for _, info in ipairs(teleportPoints) do
 	text.Parent = billboard
 end
 
--- ================= TELEPORT GUI =================
+-- ================= TELEPORT DROPDOWN GUI =================
 local function createTeleportGUI()
 	local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
 	if gui then gui:Destroy() end
@@ -135,52 +135,61 @@ local function createTeleportGUI()
 	gui.Name = "TeleportGUI"
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	-- Main panel centered
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 200, 0, #teleportPoints * 50 + 20)
-	frame.Position = UDim2.new(0.5, -100, 0.5, -((#teleportPoints*50+20)/2))
-	frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-	frame.BorderSizePixel = 0
-	frame.ClipsDescendants = true
-	frame.Parent = gui
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(0, 200, 0, 40)
+	container.Position = UDim2.new(1, -210, 0, 100)
+	container.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	container.BorderColor3 = Color3.fromRGB(128,0,255)
+	container.BorderSizePixel = 2
+	container.ClipsDescendants = true
+	container.Parent = gui
 
-	local uiCorner = Instance.new("UICorner")
-	uiCorner.CornerRadius = UDim.new(0, 12)
-	uiCorner.Parent = frame
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = container
+
+	local toggleButton = Instance.new("TextButton")
+	toggleButton.Size = UDim2.new(1,0,0,40)
+	toggleButton.Position = UDim2.new(0,0,0,0)
+	toggleButton.BackgroundTransparency = 1
+	toggleButton.Text = "Teleports ▼"
+	toggleButton.TextColor3 = Color3.fromRGB(255,255,0)
+	toggleButton.Font = Enum.Font.SourceSansBold
+	toggleButton.TextScaled = true
+	toggleButton.Parent = container
+
+	local buttonsFrame = Instance.new("Frame")
+	buttonsFrame.Size = UDim2.new(1,0,0,0)
+	buttonsFrame.Position = UDim2.new(0,0,1,0)
+	buttonsFrame.BackgroundTransparency = 1
+	buttonsFrame.Parent = container
+
+	local buttonsCorner = Instance.new("UICorner")
+	buttonsCorner.CornerRadius = UDim.new(0,10)
+	buttonsCorner.Parent = buttonsFrame
 
 	for i, info in ipairs(teleportPoints) do
 		local btn = Instance.new("TextButton")
 		btn.Size = UDim2.new(1,-20,0,40)
-		btn.Position = UDim2.new(0,10,0,(i-1)*50 + 10)
-		btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+		btn.Position = UDim2.new(0,10,0,(i-1)*50)
+		btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
 		btn.TextColor3 = Color3.fromRGB(255,255,0)
 		btn.TextScaled = true
 		btn.Font = Enum.Font.SourceSansBold
 		btn.Text = info[1]
 		btn.BorderSizePixel = 0
-		btn.Parent = frame
+		btn.Parent = buttonsFrame
 
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0,10)
-		corner.Parent = btn
+		local btnCorner = Instance.new("UICorner")
+		btnCorner.CornerRadius = UDim.new(0,8)
+		btnCorner.Parent = btn
 
-		-- Hover effect
 		btn.MouseEnter:Connect(function()
-			btn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+			btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
 		end)
 		btn.MouseLeave:Connect(function()
-			btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+			btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
 		end)
-
-		-- Mountain icon
-		local icon = Instance.new("Frame")
-		icon.Size = UDim2.new(0,20,0,20)
-		icon.Position = UDim2.new(0,5,0,10)
-		icon.BackgroundColor3 = Color3.fromRGB(0,200,100)
-		icon.Parent = btn
-		local iconCorner = Instance.new("UICorner")
-		iconCorner.CornerRadius = UDim.new(0,4)
-		iconCorner.Parent = icon
 
 		btn.MouseButton1Click:Connect(function()
 			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -188,6 +197,18 @@ local function createTeleportGUI()
 			end
 		end)
 	end
+
+	local open = false
+	toggleButton.MouseButton1Click:Connect(function()
+		open = not open
+		if open then
+			buttonsFrame:TweenSize(UDim2.new(1,0,0,#teleportPoints*50), "Out", "Quad", 0.3, true)
+			toggleButton.Text = "Teleports ▲"
+		else
+			buttonsFrame:TweenSize(UDim2.new(1,0,0,0), "Out", "Quad", 0.3, true)
+			toggleButton.Text = "Teleports ▼"
+		end
+	end)
 end
 
 createTeleportGUI()
@@ -249,5 +270,16 @@ UserInputService.InputEnded:Connect(function(input, gp)
 	if input.KeyCode == Enum.KeyCode.M then
 		cameraEnabled = false
 		hideWarning()
+		
+		-- Destroy every cloned object in Workspace except preview line points
+		for _, obj in ipairs(Workspace:GetChildren()) do
+			if not table.find(previewParts, obj) then
+				if obj:IsA("Model") or obj:IsA("Part") then
+					obj:Destroy()
+				end
+			end
+		end
+
+		camera.CameraType = Enum.CameraType.Custom
 	end
 end)
