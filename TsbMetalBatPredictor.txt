@@ -19,9 +19,9 @@ local POWER = 120
 local STEPS = 60
 local STEP_TIME = 0.08
 local STRAIGHT_DISTANCE = 60
-local START_FORWARD_OFFSET = 5
+local START_FORWARD_OFFSET = -30 -- prediction line starts 30 studs back
 local CAMERA_HEIGHT = 20
-local CAMERA_BACK_OFFSET = -20 -- camera back relative to landing
+local CAMERA_BACK_OFFSET = -30   -- camera offset 30 studs back toward character
 
 local teleportPoints = {
 	{"Mountain 1", Vector3.new(0, 653, -363)},
