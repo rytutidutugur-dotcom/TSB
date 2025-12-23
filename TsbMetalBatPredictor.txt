@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor (safe, no lag, normal Debris)
+-- TSB Metal Bat Predictor with Centered Teleport GUI & Camera Safety
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,7 +8,7 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
--- CONFIG
+-- ================= CONFIG =================
 local lineEnabled = false
 local cameraEnabled = false
 local previewParts = {}
@@ -28,7 +28,7 @@ local teleportPoints = {
 	{"Mountain 4", Vector3.new(-323, 642, 184)}
 }
 
--- FUNCTIONS
+-- ================= FUNCTIONS =================
 local function clearPreview()
 	for _, p in ipairs(previewParts) do
 		if p then p:Destroy() end
@@ -99,7 +99,7 @@ local function update()
 	end
 end
 
--- Waypoints
+-- ================= WAYPOINTS =================
 for _, info in ipairs(teleportPoints) do
 	local part = Instance.new("Part")
 	part.Size = Vector3.new(4,1,4)
@@ -126,7 +126,7 @@ for _, info in ipairs(teleportPoints) do
 	text.Parent = billboard
 end
 
--- Teleport GUI
+-- ================= TELEPORT GUI =================
 local function createTeleportGUI()
 	local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
 	if gui then gui:Destroy() end
@@ -135,17 +135,52 @@ local function createTeleportGUI()
 	gui.Name = "TeleportGUI"
 	gui.Parent = player:WaitForChild("PlayerGui")
 
+	-- Main panel centered
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0, 200, 0, #teleportPoints * 50 + 20)
+	frame.Position = UDim2.new(0.5, -100, 0.5, -((#teleportPoints*50+20)/2))
+	frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	frame.BorderSizePixel = 0
+	frame.ClipsDescendants = true
+	frame.Parent = gui
+
+	local uiCorner = Instance.new("UICorner")
+	uiCorner.CornerRadius = UDim.new(0, 12)
+	uiCorner.Parent = frame
+
 	for i, info in ipairs(teleportPoints) do
 		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(0,150,0,40)
-		btn.Position = UDim2.new(1,-160,0,80 + (i-1)*50)
-		btn.Text = info[1]
-		btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+		btn.Size = UDim2.new(1,-20,0,40)
+		btn.Position = UDim2.new(0,10,0,(i-1)*50 + 10)
+		btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
 		btn.TextColor3 = Color3.fromRGB(255,255,0)
-		btn.BackgroundTransparency = 0.5
-		btn.Font = Enum.Font.SourceSansBold
 		btn.TextScaled = true
-		btn.Parent = gui
+		btn.Font = Enum.Font.SourceSansBold
+		btn.Text = info[1]
+		btn.BorderSizePixel = 0
+		btn.Parent = frame
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0,10)
+		corner.Parent = btn
+
+		-- Hover effect
+		btn.MouseEnter:Connect(function()
+			btn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+		end)
+		btn.MouseLeave:Connect(function()
+			btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+		end)
+
+		-- Mountain icon
+		local icon = Instance.new("Frame")
+		icon.Size = UDim2.new(0,20,0,20)
+		icon.Position = UDim2.new(0,5,0,10)
+		icon.BackgroundColor3 = Color3.fromRGB(0,200,100)
+		icon.Parent = btn
+		local iconCorner = Instance.new("UICorner")
+		iconCorner.CornerRadius = UDim.new(0,4)
+		iconCorner.Parent = icon
 
 		btn.MouseButton1Click:Connect(function()
 			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -158,7 +193,7 @@ end
 createTeleportGUI()
 player.CharacterAdded:Connect(createTeleportGUI)
 
--- Shift Lock Warning
+-- ================= SHIFT LOCK WARNING =================
 local warningGui
 local function showWarning(text)
 	if not warningGui then
@@ -186,13 +221,12 @@ local function hideWarning()
 	if warningGui then warningGui.Enabled = false end
 end
 
--- Input Handling
+-- ================= INPUT HANDLING =================
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if input.KeyCode == Enum.KeyCode.L then
 		lineEnabled = not lineEnabled
 		if lineEnabled then
-			-- Only run update every 0.1s to avoid lag
 			RunService:BindToRenderStep("TSBUpdate", Enum.RenderPriority.Camera.Value, function()
 				update()
 			end)
