@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor Optimized (Thrown Cleanup + ESP + Waypoints + Typewriter Intro)
+-- TSB Metal Bat Predictor Optimized (Continuous Thrown Cleanup + ESP + Waypoints + Typewriter Intro)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -207,6 +207,10 @@ end
 -- ================= UPDATE FUNCTION =================
 local function update()
     if not lineEnabled then return end
+
+    -- Continuous Thrown cleanup while line is active
+    clearThrown()
+
     local char = player.Character
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
