@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor with Working Dropdown GUI
+-- TSB Metal Bat Predictor (Reverted Teleport GUI, Camera Safety Fix)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -93,40 +93,15 @@ local function update()
 
 	if cameraEnabled then
 		camera.CameraType = Enum.CameraType.Scriptable
-		camera.CFrame = CFrame.new(landingPos + Vector3.new(0, CAMERA_HEIGHT, 0), landingPos)
+		-- Ensure camera is always above terrain
+		local safeY = math.max(landingPos.Y + CAMERA_HEIGHT, landingPos.Y + 5)
+		camera.CFrame = CFrame.new(Vector3.new(landingPos.X, safeY, landingPos.Z), landingPos)
 	else
 		camera.CameraType = Enum.CameraType.Custom
 	end
 end
 
--- ================= WAYPOINTS =================
-for _, info in ipairs(teleportPoints) do
-	local part = Instance.new("Part")
-	part.Size = Vector3.new(4,1,4)
-	part.Position = info[2]
-	part.Anchored = true
-	part.CanCollide = false
-	part.Transparency = 0.8
-	part.Parent = Workspace
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.new(0,120,0,50)
-	billboard.Adornee = part
-	billboard.AlwaysOnTop = true
-	billboard.StudsOffset = Vector3.new(0,3,0)
-	billboard.Parent = part
-
-	local text = Instance.new("TextLabel")
-	text.Size = UDim2.new(1,0,1,0)
-	text.BackgroundTransparency = 1
-	text.Text = info[1]
-	text.TextColor3 = Color3.fromRGB(255,255,0)
-	text.TextScaled = true
-	text.Font = Enum.Font.SourceSansBold
-	text.Parent = billboard
-end
-
--- ================= TELEPORT DROPDOWN GUI =================
+-- ================= WAYPOINT BUTTON GUI =================
 local function createTeleportGUI()
 	local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
 	if gui then gui:Destroy() end
@@ -135,57 +110,18 @@ local function createTeleportGUI()
 	gui.Name = "TeleportGUI"
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	local container = Instance.new("Frame")
-	container.Size = UDim2.new(0, 200, 0, 40)
-	container.Position = UDim2.new(1, -210, 0, 100)
-	container.BackgroundColor3 = Color3.fromRGB(0,0,0)
-	container.BorderColor3 = Color3.fromRGB(128,0,255)
-	container.BorderSizePixel = 2
-	container.ClipsDescendants = true
-	container.Parent = gui
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = container
-
-	local toggleButton = Instance.new("TextButton")
-	toggleButton.Size = UDim2.new(1,0,0,40)
-	toggleButton.Position = UDim2.new(0,0,0,0)
-	toggleButton.BackgroundTransparency = 1
-	toggleButton.Text = "Teleports ▼"
-	toggleButton.TextColor3 = Color3.fromRGB(255,255,0)
-	toggleButton.Font = Enum.Font.SourceSansBold
-	toggleButton.TextScaled = true
-	toggleButton.Parent = container
-
-	local buttonsFrame = Instance.new("Frame")
-	buttonsFrame.Size = UDim2.new(1,0,0,0)
-	buttonsFrame.Position = UDim2.new(0,0,0,40)
-	buttonsFrame.BackgroundTransparency = 1
-	buttonsFrame.Parent = container
-
 	for i, info in ipairs(teleportPoints) do
 		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(1,-20,0,40)
-		btn.Position = UDim2.new(0,10,0,(i-1)*50)
-		btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
-		btn.TextColor3 = Color3.fromRGB(255,255,0)
-		btn.TextScaled = true
-		btn.Font = Enum.Font.SourceSansBold
+		btn.Size = UDim2.new(0,150,0,40)
+		btn.Position = UDim2.new(1,-160,0,80 + (i-1)*50)
+		btn.AnchorPoint = Vector2.new(0,0)
 		btn.Text = info[1]
-		btn.BorderSizePixel = 0
-		btn.Parent = buttonsFrame
-
-		local btnCorner = Instance.new("UICorner")
-		btnCorner.CornerRadius = UDim.new(0,8)
-		btnCorner.Parent = btn
-
-		btn.MouseEnter:Connect(function()
-			btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-		end)
-		btn.MouseLeave:Connect(function()
-			btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
-		end)
+		btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+		btn.TextColor3 = Color3.fromRGB(255,255,0)
+		btn.BackgroundTransparency = 0.5
+		btn.Font = Enum.Font.SourceSansBold
+		btn.TextScaled = true
+		btn.Parent = gui
 
 		btn.MouseButton1Click:Connect(function()
 			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -193,18 +129,6 @@ local function createTeleportGUI()
 			end
 		end)
 	end
-
-	local open = false
-	toggleButton.MouseButton1Click:Connect(function()
-		open = not open
-		if open then
-			buttonsFrame:TweenSize(UDim2.new(1,0,0,#teleportPoints*50), "Out", "Quad", 0.3, true)
-			toggleButton.Text = "Teleports ▲"
-		else
-			buttonsFrame:TweenSize(UDim2.new(1,0,0,0), "Out", "Quad", 0.3, true)
-			toggleButton.Text = "Teleports ▼"
-		end
-	end)
 end
 
 createTeleportGUI()
@@ -229,8 +153,8 @@ local function showWarning(text)
 		label.Text = text
 		label.Parent = warningGui
 	else
-		warningGui.Label.Text = text
 		warningGui.Enabled = true
+		warningGui.TextLabel.Text = text
 	end
 end
 
@@ -244,9 +168,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
 	if input.KeyCode == Enum.KeyCode.L then
 		lineEnabled = not lineEnabled
 		if lineEnabled then
-			RunService:BindToRenderStep("TSBUpdate", Enum.RenderPriority.Camera.Value, function()
-				update()
-			end)
+			RunService:BindToRenderStep("TSBUpdate", Enum.RenderPriority.Camera.Value, update)
 		else
 			RunService:UnbindFromRenderStep("TSBUpdate")
 			clearPreview()
@@ -266,8 +188,8 @@ UserInputService.InputEnded:Connect(function(input, gp)
 	if input.KeyCode == Enum.KeyCode.M then
 		cameraEnabled = false
 		hideWarning()
-		
-		-- Destroy every cloned object in Workspace except preview line points
+
+		-- Destroy cloned objects except line parts
 		for _, obj in ipairs(Workspace:GetChildren()) do
 			if not table.find(previewParts, obj) then
 				if obj:IsA("Model") or obj:IsA("Part") then
