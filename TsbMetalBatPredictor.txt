@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor with Fancy Right-Hand Teleports
+-- TSB Metal Bat Predictor with Right-Hand Teleports + Player ESP
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,6 +12,7 @@ local camera = Workspace.CurrentCamera
 local lineEnabled = false
 local cameraEnabled = false
 local previewParts = {}
+local playerEsp = {} -- store ESP elements
 
 local GRAVITY = Workspace.Gravity * 0.1
 local POWER = 120
@@ -81,6 +82,68 @@ local function simulate(origin, direction)
     return pos
 end
 
+-- ================= PLAYER ESP =================
+local function updateESP()
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0, 2, 0)
+    local landingPos = simulate(startPos, root.CFrame.LookVector)
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = plr.Character.HumanoidRootPart
+            local distance = math.ceil((hrp.Position - landingPos).Magnitude)
+            local velocity = math.ceil(hrp.Velocity.Magnitude)
+
+            if not playerEsp[plr] then
+                local gui = Instance.new("BillboardGui")
+                gui.Size = UDim2.new(0, 120, 0, 50)
+                gui.AlwaysOnTop = true
+                gui.StudsOffset = Vector3.new(0, 3, 0)
+                gui.Name = "ESPGui"
+                gui.Parent = hrp
+
+                local distanceLabel = Instance.new("TextLabel")
+                distanceLabel.Size = UDim2.new(1,0,0.5,0)
+                distanceLabel.BackgroundTransparency = 1
+                distanceLabel.TextColor3 = Color3.fromRGB(255,255,0)
+                distanceLabel.Font = Enum.Font.SourceSansBold
+                distanceLabel.TextScaled = true
+                distanceLabel.Text = "Dist: 0"
+                distanceLabel.Parent = gui
+
+                local velocityLabel = Instance.new("TextLabel")
+                velocityLabel.Size = UDim2.new(1,0,0.5,0)
+                velocityLabel.Position = UDim2.new(0,0,0.5,0)
+                velocityLabel.BackgroundTransparency = 1
+                velocityLabel.TextColor3 = Color3.fromRGB(255,255,0)
+                velocityLabel.Font = Enum.Font.SourceSansBold
+                velocityLabel.TextScaled = true
+                velocityLabel.Text = "Vel: 0"
+                velocityLabel.Parent = gui
+
+                -- ESP box
+                local box = Instance.new("Frame")
+                box.Size = UDim2.new(1,0,1,0)
+                box.Position = UDim2.new(0,0,0,0)
+                box.BackgroundTransparency = 0.7
+                box.BorderColor3 = Color3.fromRGB(128,0,255)
+                box.BorderSizePixel = 2
+                box.Parent = gui
+
+                playerEsp[plr] = {gui=gui, dist=distanceLabel, vel=velocityLabel}
+            end
+
+            -- update values
+            playerEsp[plr].dist.Text = "Dist: "..distance
+            playerEsp[plr].vel.Text = "Vel: "..velocity
+        end
+    end
+end
+
+-- ================= UPDATE FUNCTION =================
 local function update()
     if not lineEnabled then return end
     local char = player.Character
@@ -88,7 +151,7 @@ local function update()
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0, 2, 0)
+    local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0,2,0)
     local landingPos = simulate(startPos, root.CFrame.LookVector)
 
     if cameraEnabled then
@@ -98,6 +161,9 @@ local function update()
     else
         camera.CameraType = Enum.CameraType.Custom
     end
+
+    -- update ESP every frame
+    updateESP()
 end
 
 -- ================= WAYPOINTS =================
