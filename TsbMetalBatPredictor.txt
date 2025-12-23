@@ -132,7 +132,12 @@ local function createWaypoint(name, pos)
 end
 
 local function createTeleportGUI()
-	local screenGui = Instance.new("ScreenGui")
+	local screenGui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
+	if screenGui then
+		screenGui:Destroy()
+	end
+
+	screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "TeleportGUI"
 	screenGui.Parent = player:WaitForChild("PlayerGui")
 
@@ -162,6 +167,11 @@ for _, info in ipairs(teleportPoints) do
 	createWaypoint(info[1], info[2])
 end
 createTeleportGUI()
+
+-- Make GUI reappear on respawn
+player.CharacterAdded:Connect(function()
+	createTeleportGUI()
+end)
 
 -- ================= INPUT HANDLING =================
 UserInputService.InputBegan:Connect(function(input, gp)
