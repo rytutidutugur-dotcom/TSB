@@ -1,10 +1,9 @@
--- TSB Metal Bat Predictor Optimized with ESP and Debris Cleanup
+-- TSB Metal Bat Predictor Optimized (Lag-Free)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -16,7 +15,7 @@ local previewPartsFolder = Instance.new("Folder")
 previewPartsFolder.Name = "TSBPreviewParts"
 previewPartsFolder.Parent = Workspace
 
-local playerESP = {} -- store ESP per player
+local playerESP = {}
 
 local GRAVITY = Workspace.Gravity * 0.1
 local POWER = 120
@@ -63,9 +62,10 @@ do
         task.wait(0.05)
     end
 
-    for i = 1, 20 do
-        label.TextTransparency = i/20
-        label.TextStrokeTransparency = i/20
+    -- Longer fade out
+    for i = 1, 60 do
+        label.TextTransparency = i/60
+        label.TextStrokeTransparency = i/60
         task.wait(0.03)
     end
 
@@ -298,19 +298,10 @@ UserInputService.InputEnded:Connect(function(input,gp)
     end
 end)
 
--- ================= DEBRIS REDUCTION =================
--- Remove all excess parts in Workspace every 10 seconds (except preview and ESP)
-task.spawn(function()
-    while true do
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            if obj:IsA("Part") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
-                if obj.Parent ~= previewPartsFolder then
-                    if not obj:IsDescendantOf(player.Character) then
-                        pcall(function() obj:Destroy() end)
-                    end
-                end
-            end
-        end
-        task.wait(10)
+-- ================= CLEANUP ON PLAYER LEAVE =================
+Players.PlayerRemoving:Connect(function(plr)
+    if playerESP[plr] then
+        playerESP[plr].gui:Destroy()
+        playerESP[plr] = nil
     end
 end)
