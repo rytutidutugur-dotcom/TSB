@@ -1,9 +1,10 @@
--- TSB Metal Bat Predictor with Camera Shift Lock Check
+-- TSB Metal Bat Predictor with Camera Shift Lock Check & Debris-safe Preview
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -49,6 +50,9 @@ local function makePoint(pos)
 	p.Position = pos
 	p.Parent = Workspace
 	table.insert(previewParts, p)
+	
+	-- Automatically remove after 5 seconds to avoid debris issues
+	Debris:AddItem(p, 5)
 end
 
 local function simulate(origin, direction)
