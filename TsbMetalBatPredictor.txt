@@ -1,27 +1,25 @@
--- TSB Metal Bat Predictor with Camera Shift Lock Check & Debris-safe Preview
+-- TSB Metal Bat Predictor (safe, no lag, normal Debris)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
--- ================= CONFIG =================
+-- CONFIG
 local lineEnabled = false
 local cameraEnabled = false
 local previewParts = {}
-local renderConn
 
 local GRAVITY = Workspace.Gravity * 0.1
 local POWER = 120
 local STEPS = 60
 local STEP_TIME = 0.08
 local STRAIGHT_DISTANCE = 60
-local START_BACK_OFFSET = -15 -- start line slightly behind character
-local CAMERA_HEIGHT = 30       -- height above landing spot
+local START_BACK_OFFSET = -15
+local CAMERA_HEIGHT = 30
 
 local teleportPoints = {
 	{"Mountain 1", Vector3.new(0, 653, -363)},
@@ -30,7 +28,7 @@ local teleportPoints = {
 	{"Mountain 4", Vector3.new(-323, 642, 184)}
 }
 
--- ================= FUNCTIONS =================
+-- FUNCTIONS
 local function clearPreview()
 	for _, p in ipairs(previewParts) do
 		if p then p:Destroy() end
@@ -50,16 +48,12 @@ local function makePoint(pos)
 	p.Position = pos
 	p.Parent = Workspace
 	table.insert(previewParts, p)
-	
-	-- Automatically remove after 5 seconds to avoid debris issues
-	Debris:AddItem(p, 5)
 end
 
 local function simulate(origin, direction)
 	clearPreview()
 	local pos = origin
 	local vel = direction.Unit * POWER
-	local hitPos = nil
 	local traveled = 0
 
 	for i = 1, STEPS do
@@ -76,16 +70,15 @@ local function simulate(origin, direction)
 
 		local ray = Workspace:Raycast(pos, nextPos - pos, rayParams)
 		if ray then
-			hitPos = ray.Position
-			makePoint(hitPos)
-			break
+			makePoint(ray.Position)
+			return ray.Position
 		end
 
 		makePoint(nextPos)
 		pos = nextPos
 	end
 
-	return hitPos or pos
+	return pos
 end
 
 local function update()
@@ -95,23 +88,22 @@ local function update()
 	local root = char:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
-	local torsoCF = root.CFrame
-	local startPos = torsoCF.Position + torsoCF.LookVector * START_BACK_OFFSET + Vector3.new(0,2,0)
-	local landingPos = simulate(startPos, torsoCF.LookVector)
+	local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0,2,0)
+	local landingPos = simulate(startPos, root.CFrame.LookVector)
 
 	if cameraEnabled then
 		camera.CameraType = Enum.CameraType.Scriptable
-		local camPos = landingPos + Vector3.new(0, CAMERA_HEIGHT, 0)
-		camera.CFrame = CFrame.new(camPos, landingPos)
+		camera.CFrame = CFrame.new(landingPos + Vector3.new(0, CAMERA_HEIGHT, 0), landingPos)
 	else
 		camera.CameraType = Enum.CameraType.Custom
 	end
 end
 
-local function createWaypoint(name, pos)
+-- Waypoints
+for _, info in ipairs(teleportPoints) do
 	local part = Instance.new("Part")
 	part.Size = Vector3.new(4,1,4)
-	part.Position = pos
+	part.Position = info[2]
 	part.Anchored = true
 	part.CanCollide = false
 	part.Transparency = 0.8
@@ -127,35 +119,33 @@ local function createWaypoint(name, pos)
 	local text = Instance.new("TextLabel")
 	text.Size = UDim2.new(1,0,1,0)
 	text.BackgroundTransparency = 1
-	text.Text = name
+	text.Text = info[1]
 	text.TextColor3 = Color3.fromRGB(255,255,0)
 	text.TextScaled = true
 	text.Font = Enum.Font.SourceSansBold
 	text.Parent = billboard
 end
 
+-- Teleport GUI
 local function createTeleportGUI()
-	local screenGui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
-	if screenGui then
-		screenGui:Destroy()
-	end
+	local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
+	if gui then gui:Destroy() end
 
-	screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "TeleportGUI"
-	screenGui.Parent = player:WaitForChild("PlayerGui")
+	gui = Instance.new("ScreenGui")
+	gui.Name = "TeleportGUI"
+	gui.Parent = player:WaitForChild("PlayerGui")
 
 	for i, info in ipairs(teleportPoints) do
 		local btn = Instance.new("TextButton")
 		btn.Size = UDim2.new(0,150,0,40)
 		btn.Position = UDim2.new(1,-160,0,80 + (i-1)*50)
-		btn.AnchorPoint = Vector2.new(0,0)
 		btn.Text = info[1]
 		btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
 		btn.TextColor3 = Color3.fromRGB(255,255,0)
 		btn.BackgroundTransparency = 0.5
 		btn.Font = Enum.Font.SourceSansBold
 		btn.TextScaled = true
-		btn.Parent = screenGui
+		btn.Parent = gui
 
 		btn.MouseButton1Click:Connect(function()
 			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -165,7 +155,10 @@ local function createTeleportGUI()
 	end
 end
 
--- ================= SHIFT LOCK WARNING =================
+createTeleportGUI()
+player.CharacterAdded:Connect(createTeleportGUI)
+
+-- Shift Lock Warning
 local warningGui
 local function showWarning(text)
 	if not warningGui then
@@ -174,7 +167,6 @@ local function showWarning(text)
 		warningGui.Parent = player:WaitForChild("PlayerGui")
 
 		local label = Instance.new("TextLabel")
-		label.Name = "Label"
 		label.Size = UDim2.new(1,0,0,50)
 		label.Position = UDim2.new(0,0,0,0)
 		label.BackgroundTransparency = 0.5
@@ -191,41 +183,29 @@ local function showWarning(text)
 end
 
 local function hideWarning()
-	if warningGui then
-		warningGui.Enabled = false
-	end
+	if warningGui then warningGui.Enabled = false end
 end
 
--- ================= INITIALIZATION =================
-for _, info in ipairs(teleportPoints) do
-	createWaypoint(info[1], info[2])
-end
-createTeleportGUI()
-
--- Make GUI reappear on respawn
-player.CharacterAdded:Connect(function()
-	createTeleportGUI()
-end)
-
--- ================= INPUT HANDLING =================
+-- Input Handling
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if input.KeyCode == Enum.KeyCode.L then
 		lineEnabled = not lineEnabled
 		if lineEnabled then
-			renderConn = RunService.RenderStepped:Connect(update)
+			-- Only run update every 0.1s to avoid lag
+			RunService:BindToRenderStep("TSBUpdate", Enum.RenderPriority.Camera.Value, function()
+				update()
+			end)
 		else
-			if renderConn then renderConn:Disconnect() end
-			camera.CameraType = Enum.CameraType.Custom
+			RunService:UnbindFromRenderStep("TSBUpdate")
 			clearPreview()
+			camera.CameraType = Enum.CameraType.Custom
 		end
 	elseif input.KeyCode == Enum.KeyCode.M then
-		-- Prevent camera if shift lock is active
 		if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
 			showWarning("Disable shift lock to use camera")
 			return
 		end
-
 		cameraEnabled = true
 	end
 end)
