@@ -1,9 +1,10 @@
--- TSB Metal Bat Predictor (Optimized for Performance)
+-- TSB Metal Bat Predictor (Optimized with Typewriter Intro)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -32,6 +33,47 @@ local teleportPoints = {
     {"Mountain 4", Vector3.new(-323, 642, 184)}
 }
 
+-- ================= TYPEWRITER INTRO =================
+do
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "IntroGUI"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,0,0,50)
+    label.Position = UDim2.new(0,0,0,0)
+    label.BackgroundTransparency = 0.5
+    label.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    label.TextColor3 = Color3.fromRGB(255,255,0)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
+    label.Text = ""
+    label.Parent = screenGui
+
+    -- Click sound
+    local click = Instance.new("Sound")
+    click.SoundId = "rbxassetid://5419091327" -- small click sound
+    click.Volume = 0.5
+    click.Parent = label
+
+    local text = "Made by 1Cozmo1"
+    for i = 1, #text do
+        label.Text = text:sub(1,i)
+        click:Play()
+        task.wait(0.05)
+    end
+
+    -- Fade out
+    for i = 1, 20 do
+        label.TextTransparency = i/20
+        label.TextStrokeTransparency = i/20
+        label.BackgroundTransparency = 0.5 + i*0.025
+        task.wait(0.03)
+    end
+
+    screenGui:Destroy()
+end
+
 -- ================= FUNCTIONS =================
 local function clearPreview()
     for _, p in ipairs(previewPartsFolder:GetChildren()) do
@@ -41,10 +83,10 @@ end
 
 local function makePoint(pos)
     local p = Instance.new("Part")
-    p.Size = Vector3.new(0.35, 0.35, 0.35)
+    p.Size = Vector3.new(0.35,0.35,0.35)
     p.Shape = Enum.PartType.Ball
     p.Material = Enum.Material.Neon
-    p.Color = Color3.fromRGB(255, 255, 255)
+    p.Color = Color3.fromRGB(255,255,255)
     p.Transparency = 0.4
     p.Anchored = true
     p.CanCollide = false
@@ -79,47 +121,45 @@ local function simulate(origin, direction)
         makePoint(nextPos)
         pos = nextPos
     end
-
     return pos
 end
 
--- ================= ESP =================
+-- ================= PLAYER ESP =================
 local function createESPForPlayer(plr)
     if playerESP[plr] then return end
     if not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then return end
     local hrp = plr.Character.HumanoidRootPart
 
     local gui = Instance.new("BillboardGui")
-    gui.Size = UDim2.new(0, 120, 0, 50)
+    gui.Size = UDim2.new(0,120,0,50)
     gui.AlwaysOnTop = true
-    gui.StudsOffset = Vector3.new(0, 3, 0)
+    gui.StudsOffset = Vector3.new(0,3,0)
     gui.Parent = hrp
 
     local distanceLabel = Instance.new("TextLabel")
-    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distanceLabel.Size = UDim2.new(1,0,0.5,0)
     distanceLabel.BackgroundTransparency = 1
-    distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    distanceLabel.TextColor3 = Color3.fromRGB(255,255,0)
     distanceLabel.Font = Enum.Font.SourceSansBold
     distanceLabel.TextScaled = true
     distanceLabel.Text = "Dist: 0"
     distanceLabel.Parent = gui
 
     local velocityLabel = Instance.new("TextLabel")
-    velocityLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    velocityLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    velocityLabel.Size = UDim2.new(1,0,0.5,0)
+    velocityLabel.Position = UDim2.new(0,0,0.5,0)
     velocityLabel.BackgroundTransparency = 1
-    velocityLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    velocityLabel.TextColor3 = Color3.fromRGB(255,255,0)
     velocityLabel.Font = Enum.Font.SourceSansBold
     velocityLabel.TextScaled = true
     velocityLabel.Text = "Vel: 0"
     velocityLabel.Parent = gui
 
-    -- ESP box
     local box = Instance.new("Frame")
-    box.Size = UDim2.new(1, 0, 1, 0)
-    box.Position = UDim2.new(0, 0, 0, 0)
+    box.Size = UDim2.new(1,0,1,0)
+    box.Position = UDim2.new(0,0,0,0)
     box.BackgroundTransparency = 0.7
-    box.BorderColor3 = Color3.fromRGB(128, 0, 255)
+    box.BorderColor3 = Color3.fromRGB(128,0,255)
     box.BorderSizePixel = 2
     box.Parent = gui
 
@@ -155,10 +195,10 @@ local function update()
 
     if cameraEnabled then
         camera.CameraType = Enum.CameraType.Scriptable
-        local safeY = math.max(landingPos.Y + CAMERA_HEIGHT, landingPos.Y + 5)
-        camera.CFrame = CFrame.new(Vector3.new(landingPos.X, safeY, landingPos.Z), landingPos)
+        camera.CFrame = CFrame.new(landingPos + Vector3.new(0,CAMERA_HEIGHT,0), landingPos)
     else
         camera.CameraType = Enum.CameraType.Custom
+        clearPreview()
     end
 end
 
@@ -173,33 +213,28 @@ local function createTeleportGUI()
 
     for i, info in ipairs(teleportPoints) do
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 150, 0, 40)
-        btn.Position = UDim2.new(1, -160, 0, 80 + (i - 1) * 50)
-        btn.AnchorPoint = Vector2.new(0, 0)
+        btn.Size = UDim2.new(0,150,0,40)
+        btn.Position = UDim2.new(1,-160,0,80+(i-1)*50)
+        btn.AnchorPoint = Vector2.new(0,0)
         btn.Text = info[1]
-        btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        btn.BorderColor3 = Color3.fromRGB(128, 0, 255)
+        btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        btn.BorderColor3 = Color3.fromRGB(128,0,255)
         btn.BorderSizePixel = 2
-        btn.TextColor3 = Color3.fromRGB(255, 255, 0)
+        btn.TextColor3 = Color3.fromRGB(255,255,0)
         btn.BackgroundTransparency = 0.3
         btn.Font = Enum.Font.SourceSansBold
         btn.TextScaled = true
         btn.Parent = gui
 
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 10)
+        corner.CornerRadius = UDim.new(0,10)
         corner.Parent = btn
 
-        btn.MouseEnter:Connect(function()
-            btn.BackgroundTransparency = 0
-        end)
-        btn.MouseLeave:Connect(function()
-            btn.BackgroundTransparency = 0.3
-        end)
-
+        btn.MouseEnter:Connect(function() btn.BackgroundTransparency=0 end)
+        btn.MouseLeave:Connect(function() btn.BackgroundTransparency=0.3 end)
         btn.MouseButton1Click:Connect(function()
             if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                player.Character.HumanoidRootPart.CFrame = CFrame.new(info[2] + Vector3.new(0, 5, 0))
+                player.Character.HumanoidRootPart.CFrame = CFrame.new(info[2]+Vector3.new(0,5,0))
             end
         end)
     end
@@ -215,13 +250,12 @@ local function showWarning(text)
         warningGui = Instance.new("ScreenGui")
         warningGui.Name = "ShiftLockWarning"
         warningGui.Parent = player:WaitForChild("PlayerGui")
-
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 0, 50)
-        label.Position = UDim2.new(0, 0, 0, 0)
+        label.Size = UDim2.new(1,0,0,50)
+        label.Position = UDim2.new(0,0,0,0)
         label.BackgroundTransparency = 0.5
-        label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        label.TextColor3 = Color3.fromRGB(255, 255, 0)
+        label.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        label.TextColor3 = Color3.fromRGB(255,255,0)
         label.TextScaled = true
         label.Font = Enum.Font.SourceSansBold
         label.Text = text
@@ -231,13 +265,12 @@ local function showWarning(text)
         warningGui.Enabled = true
     end
 end
-
 local function hideWarning()
-    if warningGui then warningGui.Enabled = false end
+    if warningGui then warningGui.Enabled=false end
 end
 
 -- ================= INPUT HANDLING =================
-UserInputService.InputBegan:Connect(function(input, gp)
+UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.L then
         lineEnabled = not lineEnabled
@@ -249,7 +282,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
             camera.CameraType = Enum.CameraType.Custom
         end
     elseif input.KeyCode == Enum.KeyCode.M then
-        if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
+        if UserInputService.MouseBehavior==Enum.MouseBehavior.LockCenter then
             showWarning("Disable shift lock to use camera")
             return
         end
@@ -257,7 +290,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
-UserInputService.InputEnded:Connect(function(input, gp)
+UserInputService.InputEnded:Connect(function(input,gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.M then
         cameraEnabled = false
