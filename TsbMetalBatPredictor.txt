@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor with Shift Lock Prevention
+-- TSB Metal Bat Predictor with Camera Shift Lock Check
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -97,7 +97,6 @@ local function update()
 
 	if cameraEnabled then
 		camera.CameraType = Enum.CameraType.Scriptable
-		-- Camera directly above landing position, looking straight down
 		local camPos = landingPos + Vector3.new(0, CAMERA_HEIGHT, 0)
 		camera.CFrame = CFrame.new(camPos, landingPos)
 	else
@@ -217,17 +216,13 @@ UserInputService.InputBegan:Connect(function(input, gp)
 			clearPreview()
 		end
 	elseif input.KeyCode == Enum.KeyCode.M then
-		cameraEnabled = true
-
-		-- Disable shift lock while holding M
-		local playerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
-		local controls = playerModule:GetControls()
-		controls:Disable() -- disables default controls including shift lock
-
-		-- Show warning if shift lock is currently active
+		-- Prevent camera if shift lock is active
 		if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
 			showWarning("Disable shift lock to use camera")
+			return
 		end
+
+		cameraEnabled = true
 	end
 end)
 
@@ -235,12 +230,6 @@ UserInputService.InputEnded:Connect(function(input, gp)
 	if gp then return end
 	if input.KeyCode == Enum.KeyCode.M then
 		cameraEnabled = false
-
-		-- Re-enable default controls
-		local playerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
-		local controls = playerModule:GetControls()
-		controls:Enable() -- restore default controls
-
 		hideWarning()
 	end
 end)
