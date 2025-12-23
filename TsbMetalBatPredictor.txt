@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor Optimized (Full Version with Persistent ESP + Thrown Cleanup)
+-- TSB Metal Bat Predictor Optimized (Full Version with Persistent Self-Healing ESP + Thrown Cleanup)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,9 +15,6 @@ local previewPartsFolder = Instance.new("Folder")
 previewPartsFolder.Name = "TSBPreviewParts"
 previewPartsFolder.Parent = Workspace
 
-local spawnedObjects = {} -- track dynamically created objects (waypoints, GUI)
-local playerESP = {}
-
 local GRAVITY = Workspace.Gravity * 0.1
 local POWER = 120
 local STEPS = 60
@@ -33,6 +30,8 @@ local teleportPoints = {
     {"Mountain 4", Vector3.new(-323, 642, 184)}
 }
 
+local playerESP = {}
+
 -- ================= CLEAN THROWN =================
 local function clearThrown()
     local thrownFolder = Workspace:FindFirstChild("Thrown")
@@ -41,8 +40,7 @@ local function clearThrown()
     end
 end
 
--- Immediately clear Thrown on script execution
-clearThrown()
+clearThrown() -- clear immediately on script execution
 
 -- ================= TYPEWRITER INTRO =================
 do
@@ -92,15 +90,6 @@ local function clearPreview()
     end
 end
 
-local function clearSpawnedObjects()
-    for _, obj in ipairs(spawnedObjects) do
-        if obj and obj.Parent then
-            pcall(function() obj:Destroy() end)
-        end
-    end
-    spawnedObjects = {}
-end
-
 local function makePoint(pos)
     local p = Instance.new("Part")
     p.Size = Vector3.new(0.35,0.35,0.35)
@@ -146,63 +135,62 @@ local function simulate(origin, direction)
 end
 
 -- ================= PLAYER ESP =================
-local function createESPForPlayer(plr)
-    if playerESP[plr] then return end
-    local function setupCharacter(char)
-        if not char:FindFirstChild("HumanoidRootPart") then return end
-        local hrp = char.HumanoidRootPart
+local function createESPForCharacter(char)
+    if not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
 
-        local gui = Instance.new("BillboardGui")
-        gui.Size = UDim2.new(0,120,0,50)
-        gui.AlwaysOnTop = true
-        gui.StudsOffset = Vector3.new(0,3,0)
-        gui.Adornee = hrp
-        gui.Parent = hrp
+    -- Avoid duplicating
+    if hrp:FindFirstChild("TSB_ESP") then return end
 
-        local distanceLabel = Instance.new("TextLabel")
-        distanceLabel.Size = UDim2.new(1,0,0.5,0)
-        distanceLabel.BackgroundTransparency = 1
-        distanceLabel.TextColor3 = Color3.fromRGB(255,255,0)
-        distanceLabel.Font = Enum.Font.SourceSansBold
-        distanceLabel.TextScaled = true
-        distanceLabel.Text = "Dist: 0"
-        distanceLabel.Parent = gui
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "TSB_ESP"
+    gui.Size = UDim2.new(0,120,0,50)
+    gui.AlwaysOnTop = true
+    gui.StudsOffset = Vector3.new(0,3,0)
+    gui.Adornee = hrp
+    gui.Parent = hrp
 
-        local velocityLabel = Instance.new("TextLabel")
-        velocityLabel.Size = UDim2.new(1,0,0.5,0)
-        velocityLabel.Position = UDim2.new(0,0,0.5,0)
-        velocityLabel.BackgroundTransparency = 1
-        velocityLabel.TextColor3 = Color3.fromRGB(255,255,0)
-        velocityLabel.Font = Enum.Font.SourceSansBold
-        velocityLabel.TextScaled = true
-        velocityLabel.Text = "Vel: 0"
-        velocityLabel.Parent = gui
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1,0,0.5,0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.TextColor3 = Color3.fromRGB(255,255,0)
+    distanceLabel.Font = Enum.Font.SourceSansBold
+    distanceLabel.TextScaled = true
+    distanceLabel.Text = "Dist: 0"
+    distanceLabel.Parent = gui
 
-        local box = Instance.new("Frame")
-        box.Size = UDim2.new(1,0,1,0)
-        box.Position = UDim2.new(0,0,0,0)
-        box.BackgroundTransparency = 0.7
-        box.BorderColor3 = Color3.fromRGB(128,0,255)
-        box.BorderSizePixel = 2
-        box.Parent = gui
+    local velocityLabel = Instance.new("TextLabel")
+    velocityLabel.Size = UDim2.new(1,0,0.5,0)
+    velocityLabel.Position = UDim2.new(0,0,0.5,0)
+    velocityLabel.BackgroundTransparency = 1
+    velocityLabel.TextColor3 = Color3.fromRGB(255,255,0)
+    velocityLabel.Font = Enum.Font.SourceSansBold
+    velocityLabel.TextScaled = true
+    velocityLabel.Text = "Vel: 0"
+    velocityLabel.Parent = gui
 
-        playerESP[plr] = {gui=gui, dist=distanceLabel, vel=velocityLabel}
-    end
-
-    if plr.Character then setupCharacter(plr.Character) end
-    plr.CharacterAdded:Connect(setupCharacter)
+    local box = Instance.new("Frame")
+    box.Size = UDim2.new(1,0,1,0)
+    box.Position = UDim2.new(0,0,0,0)
+    box.BackgroundTransparency = 0.7
+    box.BorderColor3 = Color3.fromRGB(128,0,255)
+    box.BorderSizePixel = 2
+    box.Parent = gui
 end
 
-local function updateESP(landingPos)
+-- Continuously ensure every other player has ESP
+local function updateAllESP(landingPos)
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            createESPForPlayer(plr)
-            local hrp = plr.Character.HumanoidRootPart
-            local distance = math.ceil((hrp.Position - landingPos).Magnitude)
-            local velocity = math.ceil(hrp.Velocity.Magnitude)
-            local esp = playerESP[plr]
-            esp.dist.Text = "Dist: "..distance
-            esp.vel.Text = "Vel: "..velocity
+        if plr ~= player and plr.Character then
+            createESPForCharacter(plr.Character)
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp:FindFirstChild("TSB_ESP") then
+                local gui = hrp.TSB_ESP
+                local distance = math.ceil((hrp.Position - landingPos).Magnitude)
+                local velocity = math.ceil(hrp.Velocity.Magnitude)
+                gui.TextLabel.Text = "Dist: "..distance
+                gui.TextLabel_2.Text = "Vel: "..velocity
+            end
         end
     end
 end
@@ -210,9 +198,7 @@ end
 -- ================= UPDATE FUNCTION =================
 local function update()
     if not lineEnabled then return end
-
-    -- Continuous Thrown cleanup while line is active
-    clearThrown()
+    clearThrown() -- continuously clean Thrown while active
 
     local char = player.Character
     if not char then return end
@@ -222,7 +208,7 @@ local function update()
     local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0,2,0)
     local landingPos = simulate(startPos, root.CFrame.LookVector)
 
-    updateESP(landingPos)
+    updateAllESP(landingPos)
 
     if cameraEnabled then
         camera.CameraType = Enum.CameraType.Scriptable
@@ -241,7 +227,6 @@ for _, info in ipairs(teleportPoints) do
     part.CanCollide = false
     part.Transparency = 0.8
     part.Parent = Workspace
-    table.insert(spawnedObjects, part)
 
     local billboard = Instance.new("BillboardGui")
     billboard.Size = UDim2.new(0,120,0,50)
@@ -249,7 +234,6 @@ for _, info in ipairs(teleportPoints) do
     billboard.StudsOffset = Vector3.new(0,3,0)
     billboard.Adornee = part
     billboard.Parent = part
-    table.insert(spawnedObjects, billboard)
 
     local text = Instance.new("TextLabel")
     text.Size = UDim2.new(1,0,1,0)
@@ -259,7 +243,6 @@ for _, info in ipairs(teleportPoints) do
     text.TextScaled = true
     text.Font = Enum.Font.SourceSansBold
     text.Parent = billboard
-    table.insert(spawnedObjects, text)
 end
 
 -- ================= TELEPORT GUI =================
@@ -321,8 +304,8 @@ local function showWarning(text)
         label.Text = text
         label.Parent = warningGui
     else
-        warningGui.Label.Text = text
         warningGui.Enabled = true
+        warningGui.TextLabel.Text = text
     end
 end
 local function hideWarning()
@@ -339,7 +322,6 @@ UserInputService.InputBegan:Connect(function(input,gp)
         else
             RunService:UnbindFromRenderStep("TSBUpdate")
             clearPreview()
-            clearSpawnedObjects()
             clearThrown()
             camera.CameraType = Enum.CameraType.Custom
         end
@@ -358,29 +340,7 @@ UserInputService.InputEnded:Connect(function(input,gp)
         cameraEnabled = false
         hideWarning()
         clearPreview()
-        clearSpawnedObjects()
         clearThrown()
         camera.CameraType = Enum.CameraType.Custom
-    end
-end)
-
--- ================= CLEANUP ON PLAYER LEAVE =================
-Players.PlayerRemoving:Connect(function(plr)
-    if playerESP[plr] then
-        playerESP[plr].gui:Destroy()
-        playerESP[plr] = nil
-    end
-end)
-
--- ================= INITIALIZE ESP FOR ALL PLAYERS =================
-for _, plr in ipairs(Players:GetPlayers()) do
-    if plr ~= player then
-        createESPForPlayer(plr)
-    end
-end
-
-Players.PlayerAdded:Connect(function(plr)
-    if plr ~= player then
-        createESPForPlayer(plr)
     end
 end)
