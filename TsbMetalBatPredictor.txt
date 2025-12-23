@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor with Right-Hand Teleports + Player ESP
+-- TSB Metal Bat Predictor (Optimized for Performance)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,8 +11,11 @@ local camera = Workspace.CurrentCamera
 -- ================= CONFIG =================
 local lineEnabled = false
 local cameraEnabled = false
-local previewParts = {}
-local playerEsp = {} -- store ESP elements
+local previewPartsFolder = Instance.new("Folder")
+previewPartsFolder.Name = "TSBPreviewParts"
+previewPartsFolder.Parent = Workspace
+
+local playerESP = {} -- store ESP per player
 
 local GRAVITY = Workspace.Gravity * 0.1
 local POWER = 120
@@ -31,10 +34,9 @@ local teleportPoints = {
 
 -- ================= FUNCTIONS =================
 local function clearPreview()
-    for _, p in ipairs(previewParts) do
-        if p then p:Destroy() end
+    for _, p in ipairs(previewPartsFolder:GetChildren()) do
+        p:Destroy()
     end
-    table.clear(previewParts)
 end
 
 local function makePoint(pos)
@@ -47,8 +49,7 @@ local function makePoint(pos)
     p.Anchored = true
     p.CanCollide = false
     p.Position = pos
-    p.Parent = Workspace
-    table.insert(previewParts, p)
+    p.Parent = previewPartsFolder
 end
 
 local function simulate(origin, direction)
@@ -82,63 +83,59 @@ local function simulate(origin, direction)
     return pos
 end
 
--- ================= PLAYER ESP =================
-local function updateESP()
-    local char = player.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0, 2, 0)
-    local landingPos = simulate(startPos, root.CFrame.LookVector)
+-- ================= ESP =================
+local function createESPForPlayer(plr)
+    if playerESP[plr] then return end
+    if not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = plr.Character.HumanoidRootPart
 
+    local gui = Instance.new("BillboardGui")
+    gui.Size = UDim2.new(0, 120, 0, 50)
+    gui.AlwaysOnTop = true
+    gui.StudsOffset = Vector3.new(0, 3, 0)
+    gui.Parent = hrp
+
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    distanceLabel.Font = Enum.Font.SourceSansBold
+    distanceLabel.TextScaled = true
+    distanceLabel.Text = "Dist: 0"
+    distanceLabel.Parent = gui
+
+    local velocityLabel = Instance.new("TextLabel")
+    velocityLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    velocityLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    velocityLabel.BackgroundTransparency = 1
+    velocityLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    velocityLabel.Font = Enum.Font.SourceSansBold
+    velocityLabel.TextScaled = true
+    velocityLabel.Text = "Vel: 0"
+    velocityLabel.Parent = gui
+
+    -- ESP box
+    local box = Instance.new("Frame")
+    box.Size = UDim2.new(1, 0, 1, 0)
+    box.Position = UDim2.new(0, 0, 0, 0)
+    box.BackgroundTransparency = 0.7
+    box.BorderColor3 = Color3.fromRGB(128, 0, 255)
+    box.BorderSizePixel = 2
+    box.Parent = gui
+
+    playerESP[plr] = {gui=gui, dist=distanceLabel, vel=velocityLabel}
+end
+
+local function updateESP(landingPos)
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            createESPForPlayer(plr)
             local hrp = plr.Character.HumanoidRootPart
             local distance = math.ceil((hrp.Position - landingPos).Magnitude)
             local velocity = math.ceil(hrp.Velocity.Magnitude)
-
-            if not playerEsp[plr] then
-                local gui = Instance.new("BillboardGui")
-                gui.Size = UDim2.new(0, 120, 0, 50)
-                gui.AlwaysOnTop = true
-                gui.StudsOffset = Vector3.new(0, 3, 0)
-                gui.Name = "ESPGui"
-                gui.Parent = hrp
-
-                local distanceLabel = Instance.new("TextLabel")
-                distanceLabel.Size = UDim2.new(1,0,0.5,0)
-                distanceLabel.BackgroundTransparency = 1
-                distanceLabel.TextColor3 = Color3.fromRGB(255,255,0)
-                distanceLabel.Font = Enum.Font.SourceSansBold
-                distanceLabel.TextScaled = true
-                distanceLabel.Text = "Dist: 0"
-                distanceLabel.Parent = gui
-
-                local velocityLabel = Instance.new("TextLabel")
-                velocityLabel.Size = UDim2.new(1,0,0.5,0)
-                velocityLabel.Position = UDim2.new(0,0,0.5,0)
-                velocityLabel.BackgroundTransparency = 1
-                velocityLabel.TextColor3 = Color3.fromRGB(255,255,0)
-                velocityLabel.Font = Enum.Font.SourceSansBold
-                velocityLabel.TextScaled = true
-                velocityLabel.Text = "Vel: 0"
-                velocityLabel.Parent = gui
-
-                -- ESP box
-                local box = Instance.new("Frame")
-                box.Size = UDim2.new(1,0,1,0)
-                box.Position = UDim2.new(0,0,0,0)
-                box.BackgroundTransparency = 0.7
-                box.BorderColor3 = Color3.fromRGB(128,0,255)
-                box.BorderSizePixel = 2
-                box.Parent = gui
-
-                playerEsp[plr] = {gui=gui, dist=distanceLabel, vel=velocityLabel}
-            end
-
-            -- update values
-            playerEsp[plr].dist.Text = "Dist: "..distance
-            playerEsp[plr].vel.Text = "Vel: "..velocity
+            local esp = playerESP[plr]
+            esp.dist.Text = "Dist: "..distance
+            esp.vel.Text = "Vel: "..velocity
         end
     end
 end
@@ -154,6 +151,8 @@ local function update()
     local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0,2,0)
     local landingPos = simulate(startPos, root.CFrame.LookVector)
 
+    updateESP(landingPos)
+
     if cameraEnabled then
         camera.CameraType = Enum.CameraType.Scriptable
         local safeY = math.max(landingPos.Y + CAMERA_HEIGHT, landingPos.Y + 5)
@@ -161,39 +160,9 @@ local function update()
     else
         camera.CameraType = Enum.CameraType.Custom
     end
-
-    -- update ESP every frame
-    updateESP()
 end
 
--- ================= WAYPOINTS =================
-for _, info in ipairs(teleportPoints) do
-    local part = Instance.new("Part")
-    part.Size = Vector3.new(4, 1, 4)
-    part.Position = info[2]
-    part.Anchored = true
-    part.CanCollide = false
-    part.Transparency = 0.8
-    part.Parent = Workspace
-
-    local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 120, 0, 50)
-    billboard.Adornee = part
-    billboard.AlwaysOnTop = true
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.Parent = part
-
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1, 0, 1, 0)
-    text.BackgroundTransparency = 1
-    text.Text = info[1]
-    text.TextColor3 = Color3.fromRGB(255, 255, 0)
-    text.TextScaled = true
-    text.Font = Enum.Font.SourceSansBold
-    text.Parent = billboard
-end
-
--- ================= RIGHT-HAND TELEPORT BUTTONS =================
+-- ================= TELEPORTS =================
 local function createTeleportGUI()
     local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
     if gui then gui:Destroy() end
