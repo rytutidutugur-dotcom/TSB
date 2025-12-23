@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor with Fixed Right-Side Dropdown GUI
+-- TSB Metal Bat Predictor with Working Dropdown GUI
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -159,15 +159,10 @@ local function createTeleportGUI()
 	toggleButton.Parent = container
 
 	local buttonsFrame = Instance.new("Frame")
-	buttonsFrame.Size = UDim2.new(1,0,0,0) -- start collapsed
-	buttonsFrame.Position = UDim2.new(0,0,1,0) -- directly under toggle
+	buttonsFrame.Size = UDim2.new(1,0,0,0)
+	buttonsFrame.Position = UDim2.new(0,0,0,40)
 	buttonsFrame.BackgroundTransparency = 1
-	buttonsFrame.AnchorPoint = Vector2.new(0,0) -- crucial for downward expansion
 	buttonsFrame.Parent = container
-
-	local buttonsCorner = Instance.new("UICorner")
-	buttonsCorner.CornerRadius = UDim.new(0,10)
-	buttonsCorner.Parent = buttonsFrame
 
 	for i, info in ipairs(teleportPoints) do
 		local btn = Instance.new("TextButton")
