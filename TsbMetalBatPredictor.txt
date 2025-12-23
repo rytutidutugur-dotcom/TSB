@@ -20,8 +20,7 @@ local STEPS = 60
 local STEP_TIME = 0.08
 local STRAIGHT_DISTANCE = 60
 local START_FORWARD_OFFSET = -30 -- prediction line starts 30 studs back
-local CAMERA_HEIGHT = 20
-local CAMERA_BACK_OFFSET = -30   -- camera offset 30 studs back toward character
+local CAMERA_HEIGHT = 30         -- height above landing spot
 
 local teleportPoints = {
 	{"Mountain 1", Vector3.new(0, 653, -363)},
@@ -98,7 +97,8 @@ local function update()
 
 	if cameraEnabled then
 		camera.CameraType = Enum.CameraType.Scriptable
-		local camPos = landingPos + Vector3.new(0, CAMERA_HEIGHT, CAMERA_BACK_OFFSET)
+		-- Camera directly above landing position, looking straight down
+		local camPos = landingPos + Vector3.new(0, CAMERA_HEIGHT, 0)
 		camera.CFrame = CFrame.new(camPos, landingPos)
 	else
 		camera.CameraType = Enum.CameraType.Custom
