@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor (Optimized with Typewriter Intro)
+-- TSB Metal Bat Predictor Optimized with ESP and Debris Cleanup
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -40,19 +40,19 @@ do
     screenGui.Parent = player:WaitForChild("PlayerGui")
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,0,0,50)
-    label.Position = UDim2.new(0,0,0,0)
-    label.BackgroundTransparency = 0.5
-    label.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    label.TextColor3 = Color3.fromRGB(255,255,0)
+    label.Size = UDim2.new(1,0,0,30)
+    label.Position = UDim2.new(0,0,0,10)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+    label.TextStrokeTransparency = 0
     label.Font = Enum.Font.SourceSansBold
     label.TextScaled = true
     label.Text = ""
     label.Parent = screenGui
 
-    -- Click sound
     local click = Instance.new("Sound")
-    click.SoundId = "rbxassetid://5419091327" -- small click sound
+    click.SoundId = "rbxassetid://5419091327"
     click.Volume = 0.5
     click.Parent = label
 
@@ -63,11 +63,9 @@ do
         task.wait(0.05)
     end
 
-    -- Fade out
     for i = 1, 20 do
         label.TextTransparency = i/20
         label.TextStrokeTransparency = i/20
-        label.BackgroundTransparency = 0.5 + i*0.025
         task.wait(0.03)
     end
 
@@ -121,6 +119,7 @@ local function simulate(origin, direction)
         makePoint(nextPos)
         pos = nextPos
     end
+
     return pos
 end
 
@@ -198,7 +197,6 @@ local function update()
         camera.CFrame = CFrame.new(landingPos + Vector3.new(0,CAMERA_HEIGHT,0), landingPos)
     else
         camera.CameraType = Enum.CameraType.Custom
-        clearPreview()
     end
 end
 
@@ -297,5 +295,22 @@ UserInputService.InputEnded:Connect(function(input,gp)
         hideWarning()
         clearPreview()
         camera.CameraType = Enum.CameraType.Custom
+    end
+end)
+
+-- ================= DEBRIS REDUCTION =================
+-- Remove all excess parts in Workspace every 10 seconds (except preview and ESP)
+task.spawn(function()
+    while true do
+        for _, obj in ipairs(Workspace:GetChildren()) do
+            if obj:IsA("Part") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
+                if obj.Parent ~= previewPartsFolder then
+                    if not obj:IsDescendantOf(player.Character) then
+                        pcall(function() obj:Destroy() end)
+                    end
+                end
+            end
+        end
+        task.wait(10)
     end
 end)
