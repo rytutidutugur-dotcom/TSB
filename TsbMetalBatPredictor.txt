@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor (Reverted Teleport GUI, Camera Safety Fix)
+-- TSB Metal Bat Predictor (Fancy Right-Hand Teleport Buttons, No Dropdown)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -93,7 +93,6 @@ local function update()
 
 	if cameraEnabled then
 		camera.CameraType = Enum.CameraType.Scriptable
-		-- Ensure camera is always above terrain
 		local safeY = math.max(landingPos.Y + CAMERA_HEIGHT, landingPos.Y + 5)
 		camera.CFrame = CFrame.new(Vector3.new(landingPos.X, safeY, landingPos.Z), landingPos)
 	else
@@ -101,7 +100,34 @@ local function update()
 	end
 end
 
--- ================= WAYPOINT BUTTON GUI =================
+-- ================= WAYPOINTS =================
+for _, info in ipairs(teleportPoints) do
+	local part = Instance.new("Part")
+	part.Size = Vector3.new(4,1,4)
+	part.Position = info[2]
+	part.Anchored = true
+	part.CanCollide = false
+	part.Transparency = 0.8
+	part.Parent = Workspace
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0,120,0,50)
+	billboard.Adornee = part
+	billboard.AlwaysOnTop = true
+	billboard.StudsOffset = Vector3.new(0,3,0)
+	billboard.Parent = part
+
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.new(1,0,1,0)
+	text.BackgroundTransparency = 1
+	text.Text = info[1]
+	text.TextColor3 = Color3.fromRGB(255,255,0)
+	text.TextScaled = true
+	text.Font = Enum.Font.SourceSansBold
+	text.Parent = billboard
+end
+
+-- ================= RIGHT-HAND TELEPORT BUTTONS =================
 local function createTeleportGUI()
 	local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
 	if gui then gui:Destroy() end
@@ -117,11 +143,24 @@ local function createTeleportGUI()
 		btn.AnchorPoint = Vector2.new(0,0)
 		btn.Text = info[1]
 		btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+		btn.BorderColor3 = Color3.fromRGB(128,0,255)
+		btn.BorderSizePixel = 2
 		btn.TextColor3 = Color3.fromRGB(255,255,0)
-		btn.BackgroundTransparency = 0.5
+		btn.BackgroundTransparency = 0.3
 		btn.Font = Enum.Font.SourceSansBold
 		btn.TextScaled = true
 		btn.Parent = gui
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0,10)
+		corner.Parent = btn
+
+		btn.MouseEnter:Connect(function()
+			btn.BackgroundTransparency = 0
+		end)
+		btn.MouseLeave:Connect(function()
+			btn.BackgroundTransparency = 0.3
+		end)
 
 		btn.MouseButton1Click:Connect(function()
 			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
