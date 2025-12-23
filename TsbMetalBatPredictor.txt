@@ -1,4 +1,4 @@
--- TSB Metal Bat Predictor
+-- TSB Metal Bat Predictor with Shift Lock Prevention
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -162,6 +162,37 @@ local function createTeleportGUI()
 	end
 end
 
+-- ================= SHIFT LOCK WARNING =================
+local warningGui
+local function showWarning(text)
+	if not warningGui then
+		warningGui = Instance.new("ScreenGui")
+		warningGui.Name = "ShiftLockWarning"
+		warningGui.Parent = player:WaitForChild("PlayerGui")
+
+		local label = Instance.new("TextLabel")
+		label.Name = "Label"
+		label.Size = UDim2.new(1,0,0,50)
+		label.Position = UDim2.new(0,0,0,0)
+		label.BackgroundTransparency = 0.5
+		label.BackgroundColor3 = Color3.fromRGB(0,0,0)
+		label.TextColor3 = Color3.fromRGB(255,255,0)
+		label.TextScaled = true
+		label.Font = Enum.Font.SourceSansBold
+		label.Text = text
+		label.Parent = warningGui
+	else
+		warningGui.Label.Text = text
+		warningGui.Enabled = true
+	end
+end
+
+local function hideWarning()
+	if warningGui then
+		warningGui.Enabled = false
+	end
+end
+
 -- ================= INITIALIZATION =================
 for _, info in ipairs(teleportPoints) do
 	createWaypoint(info[1], info[2])
@@ -187,6 +218,16 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	elseif input.KeyCode == Enum.KeyCode.M then
 		cameraEnabled = true
+
+		-- Disable shift lock while holding M
+		local playerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+		local controls = playerModule:GetControls()
+		controls:Disable() -- disables default controls including shift lock
+
+		-- Show warning if shift lock is currently active
+		if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
+			showWarning("Disable shift lock to use camera")
+		end
 	end
 end)
 
@@ -194,5 +235,12 @@ UserInputService.InputEnded:Connect(function(input, gp)
 	if gp then return end
 	if input.KeyCode == Enum.KeyCode.M then
 		cameraEnabled = false
+
+		-- Re-enable default controls
+		local playerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+		local controls = playerModule:GetControls()
+		controls:Enable() -- restore default controls
+
+		hideWarning()
 	end
 end)
