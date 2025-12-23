@@ -1,0 +1,188 @@
+-- TSB Metal Bat Predictor
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+-- ================= CONFIG =================
+local lineEnabled = false
+local cameraEnabled = false
+local previewParts = {}
+local renderConn
+
+local GRAVITY = Workspace.Gravity * 0.1
+local POWER = 120
+local STEPS = 60
+local STEP_TIME = 0.08
+local STRAIGHT_DISTANCE = 60
+local START_FORWARD_OFFSET = 5
+local CAMERA_HEIGHT = 20
+local CAMERA_BACK_OFFSET = -20 -- camera back relative to landing
+
+local teleportPoints = {
+	{"Mountain 1", Vector3.new(0, 653, -363)},
+	{"Mountain 2", Vector3.new(615, 641, -175)},
+	{"Mountain 3", Vector3.new(320, 671, 442)},
+	{"Mountain 4", Vector3.new(-323, 642, 184)}
+}
+
+-- ================= FUNCTIONS =================
+local function clearPreview()
+	for _, p in ipairs(previewParts) do
+		if p then p:Destroy() end
+	end
+	table.clear(previewParts)
+end
+
+local function makePoint(pos)
+	local p = Instance.new("Part")
+	p.Size = Vector3.new(0.35,0.35,0.35)
+	p.Shape = Enum.PartType.Ball
+	p.Material = Enum.Material.Neon
+	p.Color = Color3.fromRGB(255,255,255)
+	p.Transparency = 0.4
+	p.Anchored = true
+	p.CanCollide = false
+	p.Position = pos
+	p.Parent = Workspace
+	table.insert(previewParts, p)
+end
+
+local function simulate(origin, direction)
+	clearPreview()
+	local pos = origin
+	local vel = direction.Unit * POWER
+	local hitPos = nil
+	local traveled = 0
+
+	for i = 1, STEPS do
+		if traveled >= STRAIGHT_DISTANCE then
+			vel = vel + Vector3.new(0, -GRAVITY * STEP_TIME, 0)
+		end
+
+		local nextPos = pos + vel * STEP_TIME
+		traveled = traveled + (nextPos - pos).Magnitude
+
+		local rayParams = RaycastParams.new()
+		rayParams.FilterDescendantsInstances = {player.Character}
+		rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+		local ray = Workspace:Raycast(pos, nextPos - pos, rayParams)
+		if ray then
+			hitPos = ray.Position
+			makePoint(hitPos)
+			break
+		end
+
+		makePoint(nextPos)
+		pos = nextPos
+	end
+
+	return hitPos or pos
+end
+
+local function update()
+	if not lineEnabled then return end
+	local char = player.Character
+	if not char then return end
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local torsoCF = root.CFrame
+	local startPos = torsoCF.Position + torsoCF.LookVector * START_FORWARD_OFFSET + Vector3.new(0,2,0)
+	local landingPos = simulate(startPos, torsoCF.LookVector)
+
+	if cameraEnabled then
+		camera.CameraType = Enum.CameraType.Scriptable
+		local camPos = landingPos + Vector3.new(0, CAMERA_HEIGHT, CAMERA_BACK_OFFSET)
+		camera.CFrame = CFrame.new(camPos, landingPos)
+	else
+		camera.CameraType = Enum.CameraType.Custom
+	end
+end
+
+local function createWaypoint(name, pos)
+	local part = Instance.new("Part")
+	part.Size = Vector3.new(4,1,4)
+	part.Position = pos
+	part.Anchored = true
+	part.CanCollide = false
+	part.Transparency = 0.8
+	part.Parent = Workspace
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0,120,0,50)
+	billboard.Adornee = part
+	billboard.AlwaysOnTop = true
+	billboard.StudsOffset = Vector3.new(0,3,0)
+	billboard.Parent = part
+
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.new(1,0,1,0)
+	text.BackgroundTransparency = 1
+	text.Text = name
+	text.TextColor3 = Color3.fromRGB(255,255,0)
+	text.TextScaled = true
+	text.Font = Enum.Font.SourceSansBold
+	text.Parent = billboard
+end
+
+local function createTeleportGUI()
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "TeleportGUI"
+	screenGui.Parent = player:WaitForChild("PlayerGui")
+
+	for i, info in ipairs(teleportPoints) do
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(0,150,0,40)
+		btn.Position = UDim2.new(1,-160,0,80 + (i-1)*50)
+		btn.AnchorPoint = Vector2.new(0,0)
+		btn.Text = info[1]
+		btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+		btn.TextColor3 = Color3.fromRGB(255,255,0)
+		btn.BackgroundTransparency = 0.5
+		btn.Font = Enum.Font.SourceSansBold
+		btn.TextScaled = true
+		btn.Parent = screenGui
+
+		btn.MouseButton1Click:Connect(function()
+			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				player.Character.HumanoidRootPart.CFrame = CFrame.new(info[2] + Vector3.new(0,5,0))
+			end
+		end)
+	end
+end
+
+-- ================= INITIALIZATION =================
+for _, info in ipairs(teleportPoints) do
+	createWaypoint(info[1], info[2])
+end
+createTeleportGUI()
+
+-- ================= INPUT HANDLING =================
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.L then
+		lineEnabled = not lineEnabled
+		if lineEnabled then
+			renderConn = RunService.RenderStepped:Connect(update)
+		else
+			if renderConn then renderConn:Disconnect() end
+			camera.CameraType = Enum.CameraType.Custom
+			clearPreview()
+		end
+	elseif input.KeyCode == Enum.KeyCode.M then
+		cameraEnabled = true
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.M then
+		cameraEnabled = false
+	end
+end)
