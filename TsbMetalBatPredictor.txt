@@ -1,50 +1,176 @@
--- ================= TELEPORT GUI (FIXED & PERSISTENT) =================
-local teleportGui
+-- TSB Metal Bat Predictor (FIXED TELEPORT UI VERSION)
 
-local function createTeleportGUI()
-    local pg = player:WaitForChild("PlayerGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
-    if teleportGui then
-        teleportGui:Destroy()
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- ================= CONFIG =================
+local lineEnabled = false
+local cameraEnabled = false
+
+local previewPartsFolder = Instance.new("Folder")
+previewPartsFolder.Name = "TSBPreviewParts"
+previewPartsFolder.Parent = Workspace
+
+local spawnedObjects = {} -- ONLY ESP + WAYPOINTS
+local playerESP = {}
+
+local GRAVITY = Workspace.Gravity * 0.1
+local POWER = 120
+local STEPS = 60
+local STEP_TIME = 0.08
+local STRAIGHT_DISTANCE = 60
+local START_BACK_OFFSET = -15
+local CAMERA_HEIGHT = 30
+
+-- ================= TELEPORT POINTS =================
+local teleportPoints = {
+    {"Mountain 1", Vector3.new(0, 653, -363)},
+    {"Mountain 2", Vector3.new(615, 641, -175)},
+    {"Mountain 3", Vector3.new(320, 671, 442)},
+    {"Mountain 4", Vector3.new(-323, 642, 184)}
+}
+
+-- ================= CLEAN THROWN =================
+local function clearThrown()
+    local thrown = Workspace:FindFirstChild("Thrown")
+    if thrown then
+        for _, obj in ipairs(thrown:GetChildren()) do
+            obj:Destroy()
+        end
     end
+end
 
-    teleportGui = Instance.new("ScreenGui")
-    teleportGui.Name = "TeleportGUI"
-    teleportGui.ResetOnSpawn = false
-    teleportGui.Parent = pg
+clearThrown()
+
+-- ================= SAFE CLEAR =================
+local function clearSpawnedObjects()
+    for _, obj in ipairs(spawnedObjects) do
+        if obj and obj.Parent then
+            obj:Destroy()
+        end
+    end
+    table.clear(spawnedObjects)
+end
+
+-- ================= TELEPORT GUI =================
+local function createTeleportGUI()
+    if PlayerGui:FindFirstChild("TeleportGUI") then return end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "TeleportGUI"
+    gui.ResetOnSpawn = false
+    gui.Parent = PlayerGui
 
     for i, info in ipairs(teleportPoints) do
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0,150,0,40)
-        btn.Position = UDim2.new(1,-170,0,80+(i-1)*50)
+        btn.Position = UDim2.new(1,-170,0,120+(i-1)*50)
         btn.Text = info[1]
         btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        btn.BackgroundTransparency = 0.3
         btn.BorderColor3 = Color3.fromRGB(128,0,255)
         btn.BorderSizePixel = 2
         btn.TextColor3 = Color3.fromRGB(255,255,0)
-        btn.BackgroundTransparency = 0.25
         btn.Font = Enum.Font.SourceSansBold
         btn.TextScaled = true
-        btn.Parent = teleportGui
+        btn.Parent = gui
 
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0,10)
         corner.Parent = btn
 
         btn.MouseButton1Click:Connect(function()
-            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                player.Character.HumanoidRootPart.CFrame =
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame =
                     CFrame.new(info[2] + Vector3.new(0,5,0))
             end
         end)
     end
 end
 
--- create once
-createTeleportGUI()
+-- ALWAYS ENSURE TELEPORT UI EXISTS
+task.spawn(function()
+    while true do
+        createTeleportGUI()
+        task.wait(1)
+    end
+end)
 
--- recreate safely after respawn
-player.CharacterAdded:Connect(function()
-    task.wait(0.5)
-    createTeleportGUI()
+-- ================= PREVIEW =================
+local function clearPreview()
+    for _, p in ipairs(previewPartsFolder:GetChildren()) do
+        p:Destroy()
+    end
+end
+
+local function makePoint(pos)
+    local p = Instance.new("Part")
+    p.Size = Vector3.new(0.35,0.35,0.35)
+    p.Shape = Enum.PartType.Ball
+    p.Material = Enum.Material.Neon
+    p.Color = Color3.fromRGB(255,255,255)
+    p.Transparency = 0.4
+    p.Anchored = true
+    p.CanCollide = false
+    p.Position = pos
+    p.Parent = previewPartsFolder
+end
+
+local function simulate(origin, direction)
+    clearPreview()
+
+    local pos = origin
+    local vel = direction.Unit * POWER
+    local traveled = 0
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {player.Character}
+
+    for i = 1, STEPS do
+        if traveled >= STRAIGHT_DISTANCE then
+            vel += Vector3.new(0, -GRAVITY * STEP_TIME, 0)
+        end
+
+        local nextPos = pos + vel * STEP_TIME
+        traveled += (nextPos - pos).Magnitude
+
+        local ray = Workspace:Raycast(pos, nextPos - pos, rayParams)
+        if ray then
+            makePoint(ray.Position)
+            return ray.Position
+        end
+
+        makePoint(nextPos)
+        pos = nextPos
+    end
+
+    return pos
+end
+
+-- ================= INPUT =================
+UserInputService.InputBegan:Connect(function(input,gp)
+    if gp then return end
+
+    if input.KeyCode == Enum.KeyCode.L then
+        lineEnabled = not lineEnabled
+        if lineEnabled then
+            RunService:BindToRenderStep("TSBUpdate", Enum.RenderPriority.Camera.Value, function()
+                clearThrown()
+            end)
+        else
+            RunService:UnbindFromRenderStep("TSBUpdate")
+            clearPreview()
+            clearSpawnedObjects()
+            clearThrown()
+            camera.CameraType = Enum.CameraType.Custom
+        end
+    end
 end)
