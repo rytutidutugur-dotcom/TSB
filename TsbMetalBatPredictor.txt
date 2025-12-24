@@ -1,4 +1,5 @@
--- TSB Metal Bat Predictor (FIXED TELEPORT UI VERSION)
+
+-- TSB Metal Bat Predictor Optimized (Full Version with Persistent ESP + Thrown Cleanup)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,17 +8,15 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
-local PlayerGui = player:WaitForChild("PlayerGui")
 
 -- ================= CONFIG =================
 local lineEnabled = false
 local cameraEnabled = false
-
 local previewPartsFolder = Instance.new("Folder")
 previewPartsFolder.Name = "TSBPreviewParts"
 previewPartsFolder.Parent = Workspace
 
-local spawnedObjects = {} -- ONLY ESP + WAYPOINTS
+local spawnedObjects = {} -- track dynamically created objects (waypoints, GUI)
 local playerESP = {}
 
 local GRAVITY = Workspace.Gravity * 0.1
@@ -28,7 +27,6 @@ local STRAIGHT_DISTANCE = 60
 local START_BACK_OFFSET = -15
 local CAMERA_HEIGHT = 30
 
--- ================= TELEPORT POINTS =================
 local teleportPoints = {
     {"Mountain 1", Vector3.new(0, 653, -363)},
     {"Mountain 2", Vector3.new(615, 641, -175)},
@@ -38,76 +36,70 @@ local teleportPoints = {
 
 -- ================= CLEAN THROWN =================
 local function clearThrown()
-    local thrown = Workspace:FindFirstChild("Thrown")
-    if thrown then
-        for _, obj in ipairs(thrown:GetChildren()) do
-            obj:Destroy()
-        end
+    local thrownFolder = Workspace:FindFirstChild("Thrown")
+    if thrownFolder then
+        pcall(function() thrownFolder:Destroy() end)
     end
 end
 
+-- Immediately clear Thrown on script execution
 clearThrown()
 
--- ================= SAFE CLEAR =================
-local function clearSpawnedObjects()
-    for _, obj in ipairs(spawnedObjects) do
-        if obj and obj.Parent then
-            obj:Destroy()
-        end
+-- ================= TYPEWRITER INTRO =================
+do
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "IntroGUI"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,0,0,30)
+    label.Position = UDim2.new(0,0,0,10)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+    label.TextStrokeTransparency = 0
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
+    label.Text = ""
+    label.Parent = screenGui
+
+    local click = Instance.new("Sound")
+    click.SoundId = "rbxassetid://5419091327"
+    click.Volume = 0.5
+    click.Parent = label
+
+    local text = "Made by 1Cozmo1"
+    for i = 1, #text do
+        label.Text = text:sub(1,i)
+        click:Play()
+        task.wait(0.05)
     end
-    table.clear(spawnedObjects)
+
+    task.wait(1)
+
+    for i = 1, 60 do
+        label.TextTransparency = i/60
+        label.TextStrokeTransparency = i/60
+        task.wait(0.03)
+    end
+
+    screenGui:Destroy()
 end
 
--- ================= TELEPORT GUI =================
-local function createTeleportGUI()
-    if PlayerGui:FindFirstChild("TeleportGUI") then return end
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "TeleportGUI"
-    gui.ResetOnSpawn = false
-    gui.Parent = PlayerGui
-
-    for i, info in ipairs(teleportPoints) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0,150,0,40)
-        btn.Position = UDim2.new(1,-170,0,120+(i-1)*50)
-        btn.Text = info[1]
-        btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
-        btn.BackgroundTransparency = 0.3
-        btn.BorderColor3 = Color3.fromRGB(128,0,255)
-        btn.BorderSizePixel = 2
-        btn.TextColor3 = Color3.fromRGB(255,255,0)
-        btn.Font = Enum.Font.SourceSansBold
-        btn.TextScaled = true
-        btn.Parent = gui
-
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0,10)
-        corner.Parent = btn
-
-        btn.MouseButton1Click:Connect(function()
-            local char = player.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.HumanoidRootPart.CFrame =
-                    CFrame.new(info[2] + Vector3.new(0,5,0))
-            end
-        end)
-    end
-end
-
--- ALWAYS ENSURE TELEPORT UI EXISTS
-task.spawn(function()
-    while true do
-        createTeleportGUI()
-        task.wait(1)
-    end
-end)
-
--- ================= PREVIEW =================
+-- ================= FUNCTIONS =================
 local function clearPreview()
     for _, p in ipairs(previewPartsFolder:GetChildren()) do
         p:Destroy()
     end
+end
+
+local function clearSpawnedObjects()
+    for _, obj in ipairs(spawnedObjects) do
+        if obj and obj.Parent then
+            pcall(function() obj:Destroy() end)
+        end
+    end
+    spawnedObjects = {}
 end
 
 local function makePoint(pos)
@@ -125,22 +117,21 @@ end
 
 local function simulate(origin, direction)
     clearPreview()
-
     local pos = origin
     local vel = direction.Unit * POWER
     local traveled = 0
 
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.FilterDescendantsInstances = {player.Character}
-
     for i = 1, STEPS do
         if traveled >= STRAIGHT_DISTANCE then
-            vel += Vector3.new(0, -GRAVITY * STEP_TIME, 0)
+            vel = vel + Vector3.new(0, -GRAVITY * STEP_TIME, 0)
         end
 
         local nextPos = pos + vel * STEP_TIME
-        traveled += (nextPos - pos).Magnitude
+        traveled = traveled + (nextPos - pos).Magnitude
+
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {player.Character}
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 
         local ray = Workspace:Raycast(pos, nextPos - pos, rayParams)
         if ray then
@@ -155,16 +146,197 @@ local function simulate(origin, direction)
     return pos
 end
 
--- ================= INPUT =================
+-- ================= PLAYER ESP =================
+local function createESPForPlayer(plr)
+    if playerESP[plr] then return end
+    local function setupCharacter(char)
+        if not char:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = char.HumanoidRootPart
+
+        local gui = Instance.new("BillboardGui")
+        gui.Size = UDim2.new(0,120,0,50)
+        gui.AlwaysOnTop = true
+        gui.StudsOffset = Vector3.new(0,3,0)
+        gui.Adornee = hrp
+        gui.Parent = hrp
+
+        local distanceLabel = Instance.new("TextLabel")
+        distanceLabel.Size = UDim2.new(1,0,0.5,0)
+        distanceLabel.BackgroundTransparency = 1
+        distanceLabel.TextColor3 = Color3.fromRGB(255,255,0)
+        distanceLabel.Font = Enum.Font.SourceSansBold
+        distanceLabel.TextScaled = true
+        distanceLabel.Text = "Dist: 0"
+        distanceLabel.Parent = gui
+
+        local velocityLabel = Instance.new("TextLabel")
+        velocityLabel.Size = UDim2.new(1,0,0.5,0)
+        velocityLabel.Position = UDim2.new(0,0,0.5,0)
+        velocityLabel.BackgroundTransparency = 1
+        velocityLabel.TextColor3 = Color3.fromRGB(255,255,0)
+        velocityLabel.Font = Enum.Font.SourceSansBold
+        velocityLabel.TextScaled = true
+        velocityLabel.Text = "Vel: 0"
+        velocityLabel.Parent = gui
+
+        local box = Instance.new("Frame")
+        box.Size = UDim2.new(1,0,1,0)
+        box.Position = UDim2.new(0,0,0,0)
+        box.BackgroundTransparency = 0.7
+        box.BorderColor3 = Color3.fromRGB(128,0,255)
+        box.BorderSizePixel = 2
+        box.Parent = gui
+
+        playerESP[plr] = {gui=gui, dist=distanceLabel, vel=velocityLabel}
+    end
+
+    if plr.Character then setupCharacter(plr.Character) end
+    plr.CharacterAdded:Connect(setupCharacter)
+end
+
+local function updateESP(landingPos)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            createESPForPlayer(plr)
+            local hrp = plr.Character.HumanoidRootPart
+            local distance = math.ceil((hrp.Position - landingPos).Magnitude)
+            local velocity = math.ceil(hrp.Velocity.Magnitude)
+            local esp = playerESP[plr]
+            esp.dist.Text = "Dist: "..distance
+            esp.vel.Text = "Vel: "..velocity
+        end
+    end
+end
+
+-- ================= UPDATE FUNCTION =================
+local function update()
+    if not lineEnabled then return end
+
+    -- Continuous Thrown cleanup while line is active
+    clearThrown()
+
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local startPos = root.Position + root.CFrame.LookVector * START_BACK_OFFSET + Vector3.new(0,2,0)
+    local landingPos = simulate(startPos, root.CFrame.LookVector)
+
+    updateESP(landingPos)
+
+    if cameraEnabled then
+        camera.CameraType = Enum.CameraType.Scriptable
+        camera.CFrame = CFrame.new(landingPos + Vector3.new(0,CAMERA_HEIGHT,0), landingPos)
+    else
+        camera.CameraType = Enum.CameraType.Custom
+    end
+end
+
+-- ================= WAYPOINTS =================
+for _, info in ipairs(teleportPoints) do
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(4,1,4)
+    part.Position = info[2]
+    part.Anchored = true
+    part.CanCollide = false
+    part.Transparency = 0.8
+    part.Parent = Workspace
+    table.insert(spawnedObjects, part)
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0,120,0,50)
+    billboard.AlwaysOnTop = true
+    billboard.StudsOffset = Vector3.new(0,3,0)
+    billboard.Adornee = part
+    billboard.Parent = part
+    table.insert(spawnedObjects, billboard)
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.Text = info[1]
+    text.TextColor3 = Color3.fromRGB(255,255,0)
+    text.TextScaled = true
+    text.Font = Enum.Font.SourceSansBold
+    text.Parent = billboard
+    table.insert(spawnedObjects, text)
+end
+
+-- ================= TELEPORT GUI =================
+local function createTeleportGUI()
+    local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("TeleportGUI")
+    if gui then gui:Destroy() end
+
+    gui = Instance.new("ScreenGui")
+    gui.Name = "TeleportGUI"
+    gui.Parent = player:WaitForChild("PlayerGui")
+
+    for i, info in ipairs(teleportPoints) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0,150,0,40)
+        btn.Position = UDim2.new(1,-160,0,80+(i-1)*50)
+        btn.AnchorPoint = Vector2.new(0,0)
+        btn.Text = info[1]
+        btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        btn.BorderColor3 = Color3.fromRGB(128,0,255)
+        btn.BorderSizePixel = 2
+        btn.TextColor3 = Color3.fromRGB(255,255,0)
+        btn.BackgroundTransparency = 0.3
+        btn.Font = Enum.Font.SourceSansBold
+        btn.TextScaled = true
+        btn.Parent = gui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0,10)
+        corner.Parent = btn
+
+        btn.MouseEnter:Connect(function() btn.BackgroundTransparency=0 end)
+        btn.MouseLeave:Connect(function() btn.BackgroundTransparency=0.3 end)
+        btn.MouseButton1Click:Connect(function()
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                player.Character.HumanoidRootPart.CFrame = CFrame.new(info[2]+Vector3.new(0,5,0))
+            end
+        end)
+    end
+end
+
+createTeleportGUI()
+player.CharacterAdded:Connect(createTeleportGUI)
+
+-- ================= SHIFT LOCK WARNING =================
+local warningGui
+local function showWarning(text)
+    if not warningGui then
+        warningGui = Instance.new("ScreenGui")
+        warningGui.Name = "ShiftLockWarning"
+        warningGui.Parent = player:WaitForChild("PlayerGui")
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1,0,0,50)
+        label.Position = UDim2.new(0,0,0,0)
+        label.BackgroundTransparency = 0.5
+        label.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        label.TextColor3 = Color3.fromRGB(255,255,0)
+        label.TextScaled = true
+        label.Font = Enum.Font.SourceSansBold
+        label.Text = text
+        label.Parent = warningGui
+    else
+        warningGui.Label.Text = text
+        warningGui.Enabled = true
+    end
+end
+local function hideWarning()
+    if warningGui then warningGui.Enabled=false end
+end
+
+-- ================= INPUT HANDLING =================
 UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
-
     if input.KeyCode == Enum.KeyCode.L then
         lineEnabled = not lineEnabled
         if lineEnabled then
-            RunService:BindToRenderStep("TSBUpdate", Enum.RenderPriority.Camera.Value, function()
-                clearThrown()
-            end)
+            RunService:BindToRenderStep("TSBUpdate", Enum.RenderPriority.Camera.Value, update)
         else
             RunService:UnbindFromRenderStep("TSBUpdate")
             clearPreview()
@@ -172,5 +344,44 @@ UserInputService.InputBegan:Connect(function(input,gp)
             clearThrown()
             camera.CameraType = Enum.CameraType.Custom
         end
+    elseif input.KeyCode == Enum.KeyCode.M then
+        if UserInputService.MouseBehavior==Enum.MouseBehavior.LockCenter then
+            showWarning("Disable shift lock to use camera")
+            return
+        end
+        cameraEnabled = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input,gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.M then
+        cameraEnabled = false
+        hideWarning()
+        clearPreview()
+        clearSpawnedObjects()
+        clearThrown()
+        camera.CameraType = Enum.CameraType.Custom
+    end
+end)
+
+-- ================= CLEANUP ON PLAYER LEAVE =================
+Players.PlayerRemoving:Connect(function(plr)
+    if playerESP[plr] then
+        playerESP[plr].gui:Destroy()
+        playerESP[plr] = nil
+    end
+end)
+
+-- ================= INITIALIZE ESP FOR ALL PLAYERS =================
+for _, plr in ipairs(Players:GetPlayers()) do
+    if plr ~= player then
+        createESPForPlayer(plr)
+    end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+    if plr ~= player then
+        createESPForPlayer(plr)
     end
 end)
